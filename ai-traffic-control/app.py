@@ -17,6 +17,14 @@ if 'emergency_mode' not in st.session_state:
     st.session_state.emergency_mode = False
 if 'mode' not in st.session_state:
     st.session_state.mode = "AI Adaptive"
+if 'emergency_dir' not in st.session_state:
+    st.session_state.emergency_dir = "North-South"
+
+# Helper function for data download
+@st.cache_data
+def convert_df_to_csv(df):
+    """Converts a DataFrame to a CSV string for download."""
+    return df.to_csv().encode('utf-8')
 
 def main():
     # Header
@@ -58,19 +66,19 @@ def main():
         # Emergency Controls
         st.subheader("🚨 Emergency Controls")
         
+        # Toggle emergency mode with a state variable
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🚑 Emergency", type="primary"):
+            if st.button("🚑 Activate Emergency", type="primary"):
                 st.session_state.emergency_mode = True
-                st.success("🚨 Emergency activated!")
-        
+                st.info("🚨 Emergency activated!")
         with col2:
-            if st.button("🔄 Reset"):
+            if st.button("🔄 Deactivate"):
                 st.session_state.emergency_mode = False
-                st.info("✅ Normal operation")
+                st.success("✅ Normal operation restored.")
         
         if st.session_state.emergency_mode:
-            emergency_dir = st.selectbox("Emergency Direction", ["North-South", "East-West"])
+            st.session_state.emergency_dir = st.selectbox("Emergency Direction", ["North-South", "East-West"])
             st.error("🚨 EMERGENCY OVERRIDE ACTIVE")
         
         # System Info
@@ -137,9 +145,14 @@ def main():
     with col_signals:
         st.subheader("🚦 Signal Status")
         
+        # Updated logic for emergency mode
         if st.session_state.emergency_mode:
-            st.write("🟢 **Emergency Direction**: 45s")
-            st.write("🔴 **Other Directions**: STOP")
+            if st.session_state.emergency_dir == "North-South":
+                st.write("🟢 **North-South**: 45s")
+                st.write("🔴 **East-West**: STOP")
+            else:
+                st.write("🔴 **North-South**: STOP")
+                st.write("🟢 **East-West**: 45s")
         else:
             # Adaptive timing based on traffic
             total_ns = vehicle_counts['north'] + vehicle_counts['south']
@@ -231,7 +244,20 @@ def main():
         st.metric("🚚 Traffic Throughput", f"{round(87.5 + np.random.uniform(-5, 8), 1)}%", delta="↑ 12.3%")
     with perf_col4:
         st.metric("🌱 Emission Reduction", f"{round(15.6 + np.random.uniform(-2, 4), 1)}%", delta="↑ 3.2%")
-
+        
+    # Data export functionality
+    st.subheader("📂 Export Data")
+    vehicle_df = pd.DataFrame(
+        list(vehicle_counts.items()),
+        columns=['Direction', 'Vehicle_Count']
+    )
+    st.download_button(
+        label="Download Current Vehicle Counts as CSV",
+        data=convert_df_to_csv(vehicle_df),
+        file_name='traffic_data.csv',
+        mime='text/csv',
+    )
+    
     # Success message
     st.success("🎉 **Congratulations!** Your AI Traffic Control System is successfully deployed on Streamlit Cloud and accessible worldwide!")
 
