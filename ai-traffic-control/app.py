@@ -12,13 +12,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize session state
+# Initialize session state for all new features
 if 'emergency_mode' not in st.session_state:
     st.session_state.emergency_mode = False
 if 'mode' not in st.session_state:
     st.session_state.mode = "AI Adaptive"
 if 'emergency_dir' not in st.session_state:
     st.session_state.emergency_dir = "North-South"
+if 'pedestrian_priority' not in st.session_state:
+    st.session_state.pedestrian_priority = False
+if 'lane_reversed' not in st.session_state:
+    st.session_state.lane_reversed = False
 
 # Helper function for data download
 @st.cache_data
@@ -26,6 +30,7 @@ def convert_df_to_csv(df):
     """Converts a DataFrame to a CSV string for download."""
     return df.to_csv().encode('utf-8')
 
+# --- Main App Logic ---
 def main():
     # Header
     st.markdown("""
@@ -42,31 +47,11 @@ def main():
         # Operation Mode
         st.session_state.mode = st.selectbox(
             "Operation Mode", 
-            ["AI Adaptive", "Manual Override", "Emergency Mode"]
+            ["AI Adaptive", "Manual Override", "Emergency Mode", "Predictive Mode"]
         )
-        
-        if st.session_state.mode == "AI Adaptive":
-            st.success("✅ AI controlling traffic signals automatically")
-            algorithm = st.selectbox(
-                "AI Algorithm", 
-                ["YOLO + Adaptive Timing", "Reinforcement Learning", "Genetic Algorithm"]
-            )
-            
-            # AI Parameters
-            st.subheader("⚙️ AI Parameters")
-            confidence = st.slider("Detection Confidence", 0.3, 0.9, 0.5)
-            min_green = st.slider("Min Green Time (s)", 10, 30, 15)
-            max_green = st.slider("Max Green Time (s)", 40, 90, 60)
-            
-        elif st.session_state.mode == "Manual Override":
-            st.warning("⚠️ Manual mode active")
-            ns_time = st.slider("North-South Green (s)", 15, 60, 30)
-            ew_time = st.slider("East-West Green (s)", 15, 60, 30)
-        
+
         # Emergency Controls
         st.subheader("🚨 Emergency Controls")
-        
-        # Toggle emergency mode with a state variable
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🚑 Activate Emergency", type="primary"):
@@ -80,7 +65,24 @@ def main():
         if st.session_state.emergency_mode:
             st.session_state.emergency_dir = st.selectbox("Emergency Direction", ["North-South", "East-West"])
             st.error("🚨 EMERGENCY OVERRIDE ACTIVE")
+            
+        # Futuristic Features
+        st.subheader("🚀 Futuristic Features")
         
+        # Dynamic Lane Management
+        if st.checkbox("Dynamic Lane Management", value=st.session_state.lane_reversed):
+            st.session_state.lane_reversed = True
+            st.info("↔️ East-West Lane is now reversible!")
+        else:
+            st.session_state.lane_reversed = False
+        
+        # Pedestrian & Cyclist Priority
+        if st.checkbox("Pedestrian & Cyclist Priority", value=st.session_state.pedestrian_priority):
+            st.session_state.pedestrian_priority = True
+            st.info("🚶‍♀️ Walk signal triggered on demand.")
+        else:
+            st.session_state.pedestrian_priority = False
+
         # System Info
         st.subheader("ℹ️ System Info")
         st.info(f"🤖 AI Model: YOLO v8\n📊 Accuracy: 94.2%\n🟢 Status: Online\n🕒 Last Update: {datetime.now().strftime('%H:%M:%S')}")
@@ -92,19 +94,29 @@ def main():
         'east': np.random.randint(10, 20),
         'west': np.random.randint(5, 12)
     }
+
+    # Predictive Analysis Simulation
+    if st.session_state.mode == "Predictive Mode":
+        st.warning("🔮 AI is predicting future traffic flow.")
+        # Simulate predictive change (e.g., a major event starting in 15 mins)
+        vehicle_counts['east'] = max(vehicle_counts['east'], 30)
+        vehicle_counts['west'] = max(vehicle_counts['west'], 25)
+
     total_vehicles = sum(vehicle_counts.values())
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         status = "🟢 Online" if not st.session_state.emergency_mode else "🟡 Emergency"
-        st.metric("System Status", status, delta="All systems operational")
+        st.metric("System Status", status)
     
     with col2:
         st.metric("Total Vehicles", total_vehicles, delta=f"+{np.random.randint(1,8)}")
     
     with col3:
         avg_wait = round(2.3 + np.random.uniform(-0.5, 0.5), 1)
+        if st.session_state.emergency_mode:
+            avg_wait = 0.5
         st.metric("Avg Wait Time", f"{avg_wait} min", delta=f"-0.{np.random.randint(1,9)} min")
     
     with col4:
@@ -145,34 +157,54 @@ def main():
     with col_signals:
         st.subheader("🚦 Signal Status")
         
-        # Updated logic for emergency mode
+        # Updated logic for emergency mode & dynamic lanes
         if st.session_state.emergency_mode:
             if st.session_state.emergency_dir == "North-South":
-                st.write("🟢 **North-South**: 45s")
+                st.write("🟢 **North-South**: 45s (Emergency)")
                 st.write("🔴 **East-West**: STOP")
             else:
                 st.write("🔴 **North-South**: STOP")
-                st.write("🟢 **East-West**: 45s")
+                st.write("🟢 **East-West**: 45s (Emergency)")
+        elif st.session_state.pedestrian_priority:
+            st.write("🚶‍♂️ **Walk Signal**: 30s")
+            st.write("🔴 **All Traffic**: STOP")
         else:
-            # Adaptive timing based on traffic
+            # Adaptive timing based on traffic and dynamic lanes
             total_ns = vehicle_counts['north'] + vehicle_counts['south']
             total_ew = vehicle_counts['east'] + vehicle_counts['west']
-            
-            if total_ns > total_ew:
-                st.write(f"🟢 **North-South**: {min(60, max(15, total_ns * 2))}s")
-                st.write(f"🔴 **East-West**: {max(15, 60 - total_ns)}s")
+
+            if st.session_state.lane_reversed:
+                # Prioritize Eastbound traffic
+                st.write(f"🟢 **Eastbound**: {min(60, max(15, total_ew * 2))}s")
+                st.write(f"🔴 **Westbound**: 0s (Reversed)")
             else:
-                st.write(f"🔴 **North-South**: {max(15, 60 - total_ew)}s")
-                st.write(f"🟢 **East-West**: {min(60, max(15, total_ew * 2))}s")
-        
+                ew_time = min(60, max(15, total_ew * 2)) if total_ew > total_ns else max(15, 60 - total_ns)
+                st.write(f"🟢 **East-West**: {ew_time}s")
+
+            ns_time = min(60, max(15, total_ns * 2)) if total_ns > total_ew else max(15, 60 - total_ew)
+            st.write(f"🟢 **North-South**: {ns_time}s")
+            
         st.subheader("🤖 AI Status")
         if st.session_state.mode == "AI Adaptive":
             st.success("✅ YOLO Detection: Active")
             st.success("✅ Adaptive Control: Active")
             st.info("🧠 Processing: 32 FPS")
+        elif st.session_state.mode == "Predictive Mode":
+            st.success("🔮 Predictive Engine: Active")
+            st.info("⏳ Forecasting: 15 min ahead")
         else:
             st.warning("⚠️ AI Suspended")
 
+    # V2I Communication Simulation
+    st.subheader("📡 V2I Communication & Dynamic Updates")
+    st.info("Simulating an approaching emergency vehicle. Signal will preemptively clear the path.")
+    col_v2i, col_empty = st.columns(2)
+    with col_v2i:
+        if st.button("🚨 Simulate V2I Emergency Vehicle"):
+            st.session_state.emergency_mode = True
+            st.session_state.emergency_dir = "North-South"
+            st.success("Emergency vehicle detected! North-South lane being cleared.")
+    
     # Analytics
     st.subheader("📊 Real-time Analytics & Performance")
     
@@ -232,7 +264,7 @@ def main():
     )
     st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Performance metrics
+    # Performance and Environmental metrics
     st.subheader("⚡ System Performance Metrics")
     perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
     
@@ -243,8 +275,23 @@ def main():
     with perf_col3:
         st.metric("🚚 Traffic Throughput", f"{round(87.5 + np.random.uniform(-5, 8), 1)}%", delta="↑ 12.3%")
     with perf_col4:
-        st.metric("🌱 Emission Reduction", f"{round(15.6 + np.random.uniform(-2, 4), 1)}%", delta="↑ 3.2%")
-        
+        emission_reduction = round(15.6 + np.random.uniform(-2, 4), 1)
+        st.metric("🌱 Emission Reduction", f"{emission_reduction}%", delta="↑ 3.2%")
+
+    st.subheader("💨 Environmental Impact Monitoring")
+    # Simulate a real-time air quality chart
+    air_data = pd.DataFrame({
+        'Time': pd.date_range(datetime.now() - timedelta(minutes=10), datetime.now(), freq='1min'),
+        'CO2_Level': 400 + np.random.uniform(-10, 10, 11),
+        'NOx_Level': 50 + np.random.uniform(-5, 5, 11)
+    })
+    
+    fig_air = px.line(air_data, x='Time', y=['CO2_Level', 'NOx_Level'], 
+                      title="Air Quality Levels (Simulated)",
+                      labels={'value': 'PPM', 'variable': 'Pollutant'})
+    fig_air.update_layout(height=300)
+    st.plotly_chart(fig_air, use_container_width=True)
+
     # Data export functionality
     st.subheader("📂 Export Data")
     vehicle_df = pd.DataFrame(
